@@ -1,0 +1,21 @@
+{
+  "slack": {
+    "bot_token": "xoxb-your-bot-token-here",
+    "channel": "#meeting-minutes"
+  },
+  "google": {
+    "auth_method": "oauth2",
+    "drive_folder_id": "your-folder-id-here",
+    "service_account_path": "config/service_account.json",
+    "oauth_credentials_path": "config/credentials.json",
+    "oauth_token_path": "config/token.json"
+  },
+  "format": {
+    "template": "default",
+    "date_format": "%Y年%m月%d日"
+  },
+  "participants": {
+    "mapping_file": "config/participants.json"
+  }
+}
+

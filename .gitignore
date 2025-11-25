@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# 設定ファイル（認証情報を含む）
+config/config.json
+config/service_account.json
+config/credentials.json
+config/token.json
+*.json
+!config/participants.json
+!config/config.json.example
+
+# ログ
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Heroku
+.heroku/
+
+# その他
+*.tmp
+*.bak
+.env
+
