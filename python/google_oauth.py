@@ -62,10 +62,10 @@ class GoogleOAuth:
             self.credentials_file = project_root / credentials_path
             
             if not self.credentials_file.exists():
-            raise FileNotFoundError(
-                f'OAuth 2.0認証情報ファイルが見つかりません: {self.credentials_file}\n'
-                f'Google Cloud ConsoleでOAuth 2.0認証情報を作成し、ダウンロードしてください。'
-            )
+                raise FileNotFoundError(
+                    f'OAuth 2.0認証情報ファイルが見つかりません: {self.credentials_file}\n'
+                    f'Google Cloud ConsoleでOAuth 2.0認証情報を作成し、ダウンロードしてください。'
+                )
         
         # トークン保存ファイルのパス
         if oauth_token_json:

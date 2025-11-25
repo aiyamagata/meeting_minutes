@@ -10,18 +10,50 @@ import sys
 import logging
 from pathlib import Path
 
-# プロジェクトルートをパスに追加
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from python.main import process_transcript
-from python.config import Config
+# ログ設定（Heroku用）
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 
+# プロジェクトルートをパスに追加
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+    logger.info(f'プロジェクトルートをパスに追加しました: {project_root}')
+
+# インポート（Heroku環境では python パッケージとして認識される）
+try:
+    logger.info('python.mainからのインポートを試行します...')
+    from python.main import process_transcript
+    from python.config import Config
+    logger.info('インポートに成功しました: python.main, python.config')
+except ImportError as e:
+    logger.error(f'python.mainからのインポートに失敗しました: {str(e)}', exc_info=True)
+    # フォールバック: 相対インポートを試行
+    try:
+        logger.info('相対インポートを試行します...')
+        from main import process_transcript
+        from config import Config
+        logger.info('相対インポートに成功しました')
+    except ImportError as e2:
+        logger.error(f'相対インポートも失敗しました: {str(e2)}', exc_info=True)
+        logger.error(f'sys.path: {sys.path}')
+        raise
+
 # 設定の読み込み
-config = Config()
+try:
+    config = Config()
+    logger.info('設定ファイルの読み込みに成功しました')
+except Exception as e:
+    logger.error(f'設定ファイルの読み込みに失敗しました: {str(e)}', exc_info=True)
+    raise
 
 
 @app.route('/webhook', methods=['POST'])
