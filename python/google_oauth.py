@@ -32,31 +32,57 @@ class GoogleOAuth:
         """
         self.logger = logging.getLogger(__name__)
         
-        # OAuth 2.0認証情報ファイルのパス
-        credentials_path = config.get('google.oauth_credentials_path')
-        if not credentials_path:
-            raise ValueError(
-                'Google OAuth 2.0認証情報のパスが設定されていません。\n'
-                'config.json の google.oauth_credentials_path を設定してください。\n'
-                '例: "oauth_credentials_path": "config/credentials.json"'
-            )
+        # 環境変数から認証情報を取得（Heroku用）
+        oauth_credentials_json = os.getenv('OAUTH_CREDENTIALS_JSON')
+        oauth_token_json = os.getenv('OAUTH_TOKEN_JSON')
         
-        project_root = Path(__file__).parent.parent
-        self.credentials_file = project_root / credentials_path
-        
-        # デバッグ情報を出力
-        self.logger.debug(f'認証情報ファイルのパス: {self.credentials_file}')
-        self.logger.debug(f'ファイルの存在確認: {self.credentials_file.exists()}')
-        
-        if not self.credentials_file.exists():
+        if oauth_credentials_json:
+            # 環境変数から読み込む（Heroku）
+            import json
+            import tempfile
+            
+            # 一時ファイルに保存
+            temp_dir = Path(tempfile.gettempdir())
+            self.credentials_file = temp_dir / 'credentials.json'
+            with open(self.credentials_file, 'w', encoding='utf-8') as f:
+                json.dump(json.loads(oauth_credentials_json), f, indent=2)
+            
+            self.logger.info('環境変数からOAuth認証情報を読み込みました')
+        else:
+            # ファイルパスから読み込む（ローカル）
+            credentials_path = config.get('google.oauth_credentials_path')
+            if not credentials_path:
+                raise ValueError(
+                    'Google OAuth 2.0認証情報のパスが設定されていません。\n'
+                    'config.json の google.oauth_credentials_path を設定するか、\n'
+                    '環境変数 OAUTH_CREDENTIALS_JSON を設定してください。'
+                )
+            
+            project_root = Path(__file__).parent.parent
+            self.credentials_file = project_root / credentials_path
+            
+            if not self.credentials_file.exists():
             raise FileNotFoundError(
                 f'OAuth 2.0認証情報ファイルが見つかりません: {self.credentials_file}\n'
                 f'Google Cloud ConsoleでOAuth 2.0認証情報を作成し、ダウンロードしてください。'
             )
         
         # トークン保存ファイルのパス
-        token_path = config.get('google.oauth_token_path', 'config/token.json')
-        self.token_file = project_root / token_path
+        if oauth_token_json:
+            # 環境変数から読み込む（Heroku）
+            import tempfile
+            temp_dir = Path(tempfile.gettempdir())
+            self.token_file = temp_dir / 'token.json'
+            # 環境変数からトークンを読み込んで保存
+            import json
+            with open(self.token_file, 'w', encoding='utf-8') as f:
+                json.dump(json.loads(oauth_token_json), f, indent=2)
+            self.logger.info('環境変数からOAuthトークンを読み込みました')
+        else:
+            # ファイルパスから読み込む（ローカル）
+            token_path = config.get('google.oauth_token_path', 'config/token.json')
+            project_root = Path(__file__).parent.parent
+            self.token_file = project_root / token_path
         
         # 認証情報を取得
         self.credentials = self._get_credentials()

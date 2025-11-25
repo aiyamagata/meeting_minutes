@@ -6,9 +6,16 @@ GASから呼び出される想定
 
 from flask import Flask, request, jsonify
 import os
+import sys
 import logging
-from main import process_transcript
-from config import Config
+from pathlib import Path
+
+# プロジェクトルートをパスに追加
+project_root = Path(__file__).parent.parent
+sys.path.insert(0, str(project_root))
+
+from python.main import process_transcript
+from python.config import Config
 
 app = Flask(__name__)
 logger = logging.getLogger(__name__)

@@ -59,6 +59,8 @@ class Config:
             'GOOGLE_AUTH_METHOD': ('google', 'auth_method'),
             'OAUTH_CREDENTIALS_PATH': ('google', 'oauth_credentials_path'),
             'OAUTH_TOKEN_PATH': ('google', 'oauth_token_path'),
+            'OAUTH_CREDENTIALS_JSON': ('google', 'oauth_credentials_json'),
+            'OAUTH_TOKEN_JSON': ('google', 'oauth_token_json'),
         }
         
         for env_key, (section, key) in env_mappings.items():
