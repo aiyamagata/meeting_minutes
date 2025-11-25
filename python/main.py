@@ -107,7 +107,11 @@ def process_from_sheet(config, logger):
 
 
 def process_transcript(transcript_content, file_name, config, logger):
-    """文字起こしを処理して議事録を生成"""
+    """文字起こしを処理して議事録を生成
+    
+    Returns:
+        dict: {'doc_url': str, 'document_id': str} または None（エラー時）
+    """
     try:
         logger.info(f'処理開始: {file_name}')
         
@@ -118,11 +122,22 @@ def process_transcript(transcript_content, file_name, config, logger):
         
         # Google Documentの作成
         doc_creator = GoogleDocCreator(config)
-        doc_url = doc_creator.create_document(
+        doc_result = doc_creator.create_document(
             title=f'議事録_{datetime.now().strftime("%Y%m%d_%H%M%S")}',
             content=processed_text
         )
+        
+        # 戻り値が辞書の場合はURLとIDを取得、文字列の場合はURLのみ（後方互換性）
+        if isinstance(doc_result, dict):
+            doc_url = doc_result['url']
+            doc_id = doc_result['document_id']
+        else:
+            doc_url = doc_result
+            # URLからdocument_idを抽出
+            doc_id = doc_url.split('/')[-1] if '/' in doc_url else None
+        
         logger.info(f'Google Documentを作成しました: {doc_url}')
+        logger.info(f'Document ID: {doc_id}')
         
         # Slackに投稿
         slack_poster = SlackPoster(config)
@@ -131,6 +146,12 @@ def process_transcript(transcript_content, file_name, config, logger):
         logger.info('Slackに投稿しました')
         
         logger.info(f'処理完了: {file_name}')
+        
+        # document_idを返す（GAS側でフォルダ移動に使用）
+        return {
+            'doc_url': doc_url,
+            'document_id': doc_id
+        }
         
     except Exception as e:
         logger.error(f'処理中にエラーが発生しました: {str(e)}', exc_info=True)

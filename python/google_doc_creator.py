@@ -116,7 +116,12 @@ class GoogleDocCreator:
             doc_url = f'https://docs.google.com/document/d/{document_id}'
             
             self.logger.info(f'Google Documentの作成が完了しました: {doc_url}')
-            return doc_url
+            
+            # GAS側で移動処理を行うため、document_idも返す
+            return {
+                'url': doc_url,
+                'document_id': document_id
+            }
             
         except HttpError as e:
             self.logger.error(f'Google APIエラーが発生しました: {str(e)}')

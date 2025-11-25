@@ -84,14 +84,22 @@ def webhook():
         logger.info(f'Webhook受信: {data["file_name"]}')
         
         # 文字起こしを処理
-        process_transcript(
+        result = process_transcript(
             transcript_content=data['content'],
             file_name=data['file_name'],
             config=config,
             logger=logger
         )
         
-        return jsonify({'status': 'success'}), 200
+        # レスポンスにdocument_idを含める（GAS側でフォルダ移動に使用）
+        if result and result.get('document_id'):
+            return jsonify({
+                'status': 'success',
+                'document_id': result['document_id'],
+                'doc_url': result.get('doc_url')
+            }), 200
+        else:
+            return jsonify({'status': 'success'}), 200
         
     except Exception as e:
         logger.error(f'Webhook処理中にエラーが発生しました: {str(e)}', exc_info=True)
