@@ -136,36 +136,42 @@ class GoogleDocCreator:
             # テキストを行ごとに分割
             lines = content.split('\n')
             
-            # まず全てのテキストを挿入
-            requests = []
-            checkbox_line_indices = []  # チェックリスト項目の行番号を記録
+            # チェックリスト項目の行番号を記録（後でチェックリスト形式を適用するため）
+            checkbox_line_indices = []
+            
+            # すべてのテキストを結合して一度に挿入
+            # これにより、複数のinsertTextリクエストで同じindexを使用する問題を回避
+            full_text_parts = []
             
             for i, line in enumerate(lines):
                 # 「□」で始まる行をチェックリスト項目として認識
                 if line.strip().startswith('□'):
                     checkbox_line_indices.append(i)
                     # 「□」を削除してテキストを挿入
-                    checkbox_text = line.replace('□', '', 1).strip() + ('\n' if i < len(lines) - 1 else '')
-                    requests.append({
-                        'insertText': {
-                            'location': {'index': 1},
-                            'text': checkbox_text
-                        }
-                    })
+                    checkbox_text = line.replace('□', '', 1).strip()
+                    full_text_parts.append(checkbox_text)
                 else:
-                    text = line + ('\n' if i < len(lines) - 1 else '')
-                    requests.append({
-                        'insertText': {
-                            'location': {'index': 1},
-                            'text': text
-                        }
-                    })
+                    full_text_parts.append(line)
+                
+                # 最後の行以外は改行を追加
+                if i < len(lines) - 1:
+                    full_text_parts.append('\n')
             
-            # バッチリクエストで挿入
-            if requests:
+            # すべてのテキストを結合
+            full_text = ''.join(full_text_parts)
+            
+            # 一度のinsertTextリクエストで挿入
+            if full_text:
                 self.docs_service.documents().batchUpdate(
                     documentId=document_id,
-                    body={'requests': requests}
+                    body={
+                        'requests': [{
+                            'insertText': {
+                                'location': {'index': 1},
+                                'text': full_text
+                            }
+                        }]
+                    }
                 ).execute()
                 
                 self.logger.debug('テキストをドキュメントに挿入しました')
