@@ -188,13 +188,13 @@ function processTranscriptFile(file) {
     markAsProcessed(file);
     isMarkedAsProcessed = true;
     
-    // Pythonスクリプトに送信するためのデータを準備
-    // 実際の実装では、WebhookやPub/Subなどを使用
-    const success = sendToProcessor(fileInfo);
+    // 代替案3: GAS側でDocumentAppを使用して議事録を作成
+    // Python側でテキスト処理のみを行い、GAS側でDocumentAppを使用してドキュメントを作成
+    const success = processWithDocumentApp(fileInfo);
     
     if (!success) {
       // 送信に失敗した場合、処理済みマークをロールバック
-      Logger.log('警告: 送信に失敗したため、処理済みマークをロールバックします');
+      Logger.log('警告: 処理に失敗したため、処理済みマークをロールバックします');
       rollbackProcessedMark(file);
       isMarkedAsProcessed = false;
     }
@@ -572,6 +572,124 @@ function testGetMeetingTranscripts() {
   Logger.log('=== テスト実行開始 ===');
   getMeetingTranscripts();
   Logger.log('=== テスト実行完了 ===');
+}
+
+/**
+ * GAS側でDocumentAppを使用して議事録を作成（代替案3）
+ * @param {Object} fileInfo - ファイル情報
+ * @return {boolean} 処理が成功した場合true
+ */
+function processWithDocumentApp(fileInfo) {
+  try {
+    Logger.log('=== GAS側でDocumentAppを使用して議事録を作成 ===');
+    
+    // 1. ファイルの内容を取得
+    let content = fileInfo.content;
+    
+    // contentが空の場合、Python側でファイルIDを使って読み込む
+    if (!content || content.trim().length === 0) {
+      if (fileInfo.mime_type === 'application/vnd.google-apps.document') {
+        Logger.log('警告: contentが空です。Python側でファイルIDを使って読み込みます。');
+        // Python側でファイルを読み込んでテキスト処理を行う
+        return sendToProcessorForTextProcessing(fileInfo);
+      } else {
+        Logger.log('警告: ファイルの内容が空です。スキップします。');
+        return false;
+      }
+    }
+    
+    // 2. Python側でテキスト処理を依頼
+    Logger.log('Python側でテキスト処理を依頼します...');
+    const processedText = requestTextProcessing(content, fileInfo.name);
+    
+    if (!processedText) {
+      Logger.log('エラー: テキスト処理に失敗しました');
+      return false;
+    }
+    
+    Logger.log(`テキスト処理が完了しました (サイズ: ${processedText.length} 文字)`);
+    
+    // 3. GAS側でDocumentAppを使用して議事録を作成
+    Logger.log('DocumentAppを使用して議事録を作成します...');
+    const docTitle = `議事録_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss')}`;
+    const newDoc = DocumentApp.create(docTitle);
+    const docId = newDoc.getId();
+    const docBody = newDoc.getBody();
+    
+    // 4. テキストを挿入（setTextを使用）
+    Logger.log('テキストをドキュメントに挿入します...');
+    docBody.setText(processedText);
+    
+    // 5. フォルダに移動
+    Logger.log(`議事録ファイルをフォルダに移動します (Document ID: ${docId})`);
+    moveDocumentToFolder(docId, PROCESSED_FOLDER_ID);
+    
+    Logger.log(`議事録の作成が完了しました: https://docs.google.com/document/d/${docId}`);
+    return true;
+    
+  } catch (error) {
+    Logger.log(`GAS側での議事録作成に失敗しました: ${error.toString()}`);
+    Logger.log(error.stack);
+    return false;
+  }
+}
+
+/**
+ * Python側でテキスト処理のみを依頼
+ * @param {string} content - 元のテキスト
+ * @param {string} file_name - ファイル名
+ * @return {string|null} 処理済みテキスト（失敗時はnull）
+ */
+function requestTextProcessing(content, file_name) {
+  try {
+    const webhookUrl = PropertiesService.getScriptProperties().getProperty('WEBHOOK_URL');
+    if (!webhookUrl) {
+      Logger.log('警告: WEBHOOK_URLが設定されていません');
+      return null;
+    }
+    
+    // /process-textエンドポイントにリクエスト
+    const processTextUrl = webhookUrl.replace('/webhook', '/process-text');
+    
+    const payload = {
+      content: content,
+      file_name: file_name
+    };
+    
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    Logger.log(`テキスト処理リクエストを送信します: ${processTextUrl}`);
+    const response = UrlFetchApp.fetch(processTextUrl, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    if (responseCode === 200) {
+      const responseData = JSON.parse(responseText);
+      return responseData.processed_text || null;
+    } else {
+      Logger.log(`エラー: テキスト処理に失敗しました (${responseCode})`);
+      Logger.log(`レスポンス: ${responseText}`);
+      return null;
+    }
+  } catch (error) {
+    Logger.log(`テキスト処理リクエスト中にエラーが発生しました: ${error.toString()}`);
+    return null;
+  }
+}
+
+/**
+ * Python側でテキスト処理のみを依頼（ファイルIDを使用する場合）
+ * @param {Object} fileInfo - ファイル情報
+ * @return {boolean} 処理が成功した場合true
+ */
+function sendToProcessorForTextProcessing(fileInfo) {
+  // 既存のsendToProcessorを使用（Python側でファイルを読み込む）
+  return sendToProcessor(fileInfo);
 }
 
 /**

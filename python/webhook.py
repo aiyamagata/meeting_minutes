@@ -57,6 +57,50 @@ except Exception as e:
     raise
 
 
+@app.route('/process-text', methods=['POST'])
+def process_text():
+    """
+    テキスト処理のみを行うエンドポイント（GAS側でDocumentAppを使用する場合）
+    
+    リクエストボディの例:
+    {
+        "content": "文字起こしの内容...",
+        "file_name": "meeting_transcript.txt"
+    }
+    """
+    try:
+        data = request.get_json(force=True)
+        if not data:
+            return jsonify({'error': 'Invalid request: No data provided'}), 400
+        
+        content = data.get('content', '')
+        file_name = data.get('file_name', '')
+        
+        if not content:
+            return jsonify({'error': 'Content is required'}), 400
+        
+        logger.info(f'テキスト処理リクエスト受信: {file_name} (サイズ: {len(content)} 文字)')
+        
+        # テキスト処理のみ実行
+        from python.text_processor import TextProcessor
+        processor = TextProcessor(config)
+        processed_text = processor.process(content)
+        
+        logger.info(f'テキスト処理が完了しました (処理後サイズ: {len(processed_text)} 文字)')
+        
+        return jsonify({
+            'status': 'success',
+            'processed_text': processed_text
+        }), 200
+        
+    except Exception as e:
+        logger.error(f'テキスト処理中にエラーが発生しました: {str(e)}', exc_info=True)
+        return jsonify({
+            'error': f'Processing error: {str(e)}',
+            'error_type': type(e).__name__
+        }), 500
+
+
 @app.route('/webhook', methods=['POST'])
 def webhook():
     """
