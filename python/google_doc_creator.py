@@ -464,17 +464,35 @@ class GoogleDocCreator:
                 # その他の要素タイプ
                 else:
                     # 一般的なendIndexを取得
-                    for key in ['endIndex', 'table', 'sectionBreak']:
+                    end_index = last_element.get('endIndex', 1)
+                    for key in ['table', 'sectionBreak']:
                         if key in last_element:
-                            if key == 'endIndex':
-                                return last_element[key]
                             # テーブルやセクションブレークの場合は、その中の最後の要素を確認
+                            end_index = last_element.get('endIndex', 1)
                             break
+                    # 空のドキュメント（長さが1または2）の場合は1を返す
+                    # インデックス2で挿入しようとするとエラーになるため
+                    if end_index <= 2:
+                        return 1
+                    return end_index
             # デフォルト値（空のドキュメントは1から始まる）
             return 1
         except Exception as e:
             self.logger.warning(f'ドキュメントの長さを取得できませんでした: {str(e)}')
             # エラー時は安全のため、現在の位置を1として返す（最初からやり直し）
+            return 1
+    
+    def _get_document_length_safe(self, document_id: str) -> int:
+        """ドキュメントの現在の長さを安全に取得（空のドキュメントの場合は1を返す）"""
+        try:
+            length = self._get_document_length(document_id)
+            # 空のドキュメント（長さが1または2）の場合は1を返す
+            # インデックス2で挿入しようとするとエラーになるため
+            if length <= 2:
+                return 1
+            return length
+        except Exception as e:
+            self.logger.warning(f'ドキュメント長の安全な取得に失敗しました: {str(e)}')
             return 1
     
     def _insert_text_line_by_line(self, document_id: str, lines: list, checkbox_line_indices: list):
@@ -695,6 +713,35 @@ class GoogleDocCreator:
         
         self.logger.info(f'{len(lines)}行を挿入します')
         
+        # 空のドキュメントの場合、最初に1文字を挿入してから残りを挿入
+        doc_length = self._get_document_length_safe(document_id)
+        if doc_length <= 2 and content:
+            # 最初の1文字を挿入（空のドキュメントにインデックス1で挿入）
+            first_char = content[0] if content else ' '
+            try:
+                self.docs_service.documents().batchUpdate(
+                    documentId=document_id,
+                    body={
+                        'requests': [{
+                            'insertText': {
+                                'location': {'index': 1},
+                                'text': first_char
+                            }
+                        }]
+                    }
+                ).execute()
+                self.logger.info(f'空のドキュメントに最初の1文字を挿入しました: {repr(first_char)}')
+                # 残りのテキストを処理
+                content = content[1:] if len(content) > 1 else ''
+                if not content:
+                    return
+                # 行を再分割
+                lines = content.split('\n')
+                time.sleep(0.2)  # 少し待機
+            except Exception as e:
+                self.logger.error(f'最初の1文字の挿入に失敗しました: {str(e)}')
+                # エラーが発生した場合は通常の処理を続行
+        
         for i, line in enumerate(lines):
             # 行の最後に改行を追加（最後の行以外）
             if i < len(lines) - 1:
@@ -717,7 +764,7 @@ class GoogleDocCreator:
                 try:
                     # 現在のドキュメントの長さを取得
                     try:
-                        current_index = self._get_document_length(document_id)
+                        current_index = self._get_document_length_safe(document_id)
                     except Exception as e:
                         self.logger.warning(f'ドキュメント長の取得に失敗しました: {str(e)}')
                         # デフォルト値を使用
