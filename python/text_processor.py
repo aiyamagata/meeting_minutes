@@ -128,18 +128,28 @@ class TextProcessor:
             for pattern in patterns:
                 match = re.match(pattern, line.strip())
                 if match:
-                    name = match.group(1).strip()
-                    speech = match.group(2).strip() if len(match.groups()) > 1 else ''
-                    
-                    # 名前をマッピング
-                    fixed_name = self.participant_mapper.map(name)
-                    
-                    # 行を再構築
-                    if speech:
-                        processed_lines.append(f'{fixed_name}: {speech}')
-                    else:
-                        processed_lines.append(f'{fixed_name}:')
-                    break
+                    try:
+                        name = match.group(1).strip()
+                        # group(2)が存在するか安全に確認
+                        if match.lastindex and match.lastindex >= 2:
+                            speech = match.group(2).strip()
+                        else:
+                            speech = ''
+                        
+                        # 名前をマッピング
+                        fixed_name = self.participant_mapper.map(name)
+                        
+                        # 行を再構築
+                        if speech:
+                            processed_lines.append(f'{fixed_name}: {speech}')
+                        else:
+                            processed_lines.append(f'{fixed_name}:')
+                        break
+                    except IndexError as e:
+                        self.logger.warning(f'正規表現マッチングエラー (行: {line[:50]}): {str(e)}')
+                        # エラーが発生した場合はそのまま追加
+                        processed_lines.append(line)
+                        break
             else:
                 # パターンに一致しない場合はそのまま
                 processed_lines.append(line)
@@ -312,19 +322,33 @@ class TextProcessor:
                 for pattern in action_patterns:
                     match = re.search(pattern, line)
                     if match:
-                        name = match.group(1).strip()
-                        action_text = match.group(2).strip() if len(match.groups()) > 1 else ''
-                        deadline = match.group(3) or (match.group(4) if len(match.groups()) > 3 else None)
-                        
-                        # 名前をマッピング
-                        mapped_name = self.participant_mapper.map(name)
-                        
-                        action_items.append({
-                            'name': mapped_name,
-                            'action': action_text if action_text else None,
-                            'deadline': deadline.strip() if deadline else None
-                        })
-                        break
+                        try:
+                            name = match.group(1).strip()
+                            # group(2)が存在するか安全に確認
+                            if match.lastindex and match.lastindex >= 2:
+                                action_text = match.group(2).strip()
+                            else:
+                                action_text = ''
+                            # deadlineはgroup(3)またはgroup(4)から取得
+                            deadline = None
+                            if match.lastindex and match.lastindex >= 3:
+                                deadline = match.group(3)
+                            elif match.lastindex and match.lastindex >= 4:
+                                deadline = match.group(4)
+                            
+                            # 名前をマッピング
+                            mapped_name = self.participant_mapper.map(name)
+                            
+                            action_items.append({
+                                'name': mapped_name,
+                                'action': action_text if action_text else None,
+                                'deadline': deadline.strip() if deadline else None
+                            })
+                            break
+                        except IndexError as e:
+                            self.logger.warning(f'アクション項目抽出エラー (行: {line[:50]}): {str(e)}')
+                            # エラーが発生した場合はスキップ
+                            break
         
         return action_items
     

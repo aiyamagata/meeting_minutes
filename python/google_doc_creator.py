@@ -676,7 +676,7 @@ class GoogleDocCreator:
             raise
     
     def _insert_text_safely(self, document_id: str, content: str):
-        """テキストを安全に挿入（行単位で挿入する方法）"""
+        """テキストを安全に挿入（非常に小さなチャンクで挿入する方法）"""
         import time
         
         self.logger.info(f'テキストを安全に挿入します (サイズ: {len(content)} 文字)')
@@ -684,9 +684,14 @@ class GoogleDocCreator:
         # テキストをクリーニング
         content = self._clean_text(content)
         
-        # 行単位で挿入（より効率的）
+        if not content or not content.strip():
+            self.logger.warning('クリーニング後のテキストが空です')
+            return
+        
+        # 行単位で挿入
         lines = content.split('\n')
         current_index = 1
+        failed_lines = []
         
         self.logger.info(f'{len(lines)}行を挿入します')
         
@@ -701,42 +706,71 @@ class GoogleDocCreator:
             if not line.strip():
                 line_with_newline = '\n'
             
-            try:
-                # 現在のドキュメントの長さを取得
+            # 長い行はさらに小さなチャンクに分割（100文字ずつ）
+            max_chunk_size = 100
+            if len(line_with_newline) > max_chunk_size:
+                chunks = [line_with_newline[j:j+max_chunk_size] for j in range(0, len(line_with_newline), max_chunk_size)]
+            else:
+                chunks = [line_with_newline]
+            
+            for chunk_idx, chunk in enumerate(chunks):
                 try:
-                    current_index = self._get_document_length(document_id)
-                except:
-                    pass
-                
-                self.docs_service.documents().batchUpdate(
-                    documentId=document_id,
-                    body={
-                        'requests': [{
-                            'insertText': {
-                                'location': {'index': current_index},
-                                'text': line_with_newline
-                            }
-                        }]
-                    }
-                ).execute()
-                
-                # 10行ごとに少し待機
-                if i % 10 == 0:
-                    time.sleep(0.2)
+                    # 現在のドキュメントの長さを取得
+                    try:
+                        current_index = self._get_document_length(document_id)
+                    except Exception as e:
+                        self.logger.warning(f'ドキュメント長の取得に失敗しました: {str(e)}')
+                        # デフォルト値を使用
+                        if current_index < 1:
+                            current_index = 1
                     
-            except HttpError as e:
-                if e.resp.status == 500:
-                    self.logger.error(f'500エラーが発生しました (行 {i+1}, 内容: {repr(line_with_newline[:50])})')
-                    # エラーが発生した行をスキップして続行
+                    # チャンクをさらにクリーニング（念のため）
+                    chunk = self._clean_text(chunk)
+                    if not chunk:
+                        continue
+                    
+                    # リクエストを送信
+                    self.docs_service.documents().batchUpdate(
+                        documentId=document_id,
+                        body={
+                            'requests': [{
+                                'insertText': {
+                                    'location': {'index': current_index},
+                                    'text': chunk
+                                }
+                            }]
+                        }
+                    ).execute()
+                    
+                    # 各チャンクの後に少し待機
+                    time.sleep(0.1)
+                    
+                except HttpError as e:
+                    if e.resp.status == 500:
+                        self.logger.error(f'500エラーが発生しました (行 {i+1}, チャンク {chunk_idx+1}/{len(chunks)}, 内容: {repr(chunk[:50])})')
+                        self.logger.error(f'エラー詳細: {str(e)}')
+                        # エラーが発生したチャンクをスキップして続行
+                        failed_lines.append((i+1, chunk_idx+1))
+                        continue
+                    else:
+                        self.logger.error(f'HTTPエラーが発生しました (ステータス: {e.resp.status}): {str(e)}')
+                        raise
+                except Exception as e:
+                    self.logger.error(f'エラーが発生しました (行 {i+1}, チャンク {chunk_idx+1}/{len(chunks)}, 内容: {repr(chunk[:50])}): {str(e)}')
+                    import traceback
+                    self.logger.error(f'トレースバック: {traceback.format_exc()}')
+                    # エラーが発生したチャンクをスキップして続行
+                    failed_lines.append((i+1, chunk_idx+1))
                     continue
-                else:
-                    raise
-            except Exception as e:
-                self.logger.error(f'エラーが発生しました (行 {i+1}, 内容: {repr(line_with_newline[:50])}): {str(e)}')
-                # エラーが発生した行をスキップして続行
-                continue
+            
+            # 5行ごとに少し待機
+            if (i + 1) % 5 == 0:
+                time.sleep(0.3)
         
-        self.logger.info('テキストの挿入が完了しました')
+        if failed_lines:
+            self.logger.warning(f'{len(failed_lines)}個のチャンクの挿入に失敗しました')
+        else:
+            self.logger.info('すべてのテキストの挿入が完了しました')
     
     def _insert_single_chunk_safe(self, document_id: str, text: str, index: int, line_num: int = 0, chunk_num: int = 0, total_chunks: int = 0):
         """単一のチャンクを挿入（安全な方法、エラー時はスキップ可能）"""
