@@ -67,6 +67,12 @@ def process_text():
         "content": "文字起こしの内容...",
         "file_name": "meeting_transcript.txt"
     }
+    または
+    {
+        "file_id": "xxx",
+        "file_name": "meeting_transcript.txt",
+        "mime_type": "application/vnd.google-apps.document"
+    }
     """
     try:
         data = request.get_json(force=True)
@@ -74,10 +80,30 @@ def process_text():
             return jsonify({'error': 'Invalid request: No data provided'}), 400
         
         content = data.get('content', '')
+        file_id = data.get('file_id')
         file_name = data.get('file_name', '')
+        mime_type = data.get('mime_type', '')
+        
+        # contentが空で、file_idがある場合、Drive APIで読み込む
+        if not content and file_id and mime_type == 'application/vnd.google-apps.document':
+            logger.info(f'file_idからファイルを読み込みます: {file_id}')
+            try:
+                from python.google_doc_creator import GoogleDocCreator
+                doc_creator = GoogleDocCreator(config)
+                drive_service = doc_creator.drive_service
+                
+                # Google Documentをtext/plain形式でエクスポート
+                export_request = drive_service.files().export_media(fileId=file_id, mimeType='text/plain')
+                content_bytes = export_request.execute()
+                content = content_bytes.decode('utf-8')
+                
+                logger.info(f'Drive APIでファイルを読み込みました (サイズ: {len(content)} 文字)')
+            except Exception as e:
+                logger.error(f'Drive APIでのファイル読み込みに失敗しました: {str(e)}')
+                return jsonify({'error': f'Failed to read file from Drive API: {str(e)}'}), 500
         
         if not content:
-            return jsonify({'error': 'Content is required'}), 400
+            return jsonify({'error': 'Content is required or file_id must be provided'}), 400
         
         logger.info(f'テキスト処理リクエスト受信: {file_name} (サイズ: {len(content)} 文字)')
         

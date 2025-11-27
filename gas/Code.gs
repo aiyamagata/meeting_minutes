@@ -688,8 +688,74 @@ function requestTextProcessing(content, file_name) {
  * @return {boolean} 処理が成功した場合true
  */
 function sendToProcessorForTextProcessing(fileInfo) {
-  // 既存のsendToProcessorを使用（Python側でファイルを読み込む）
-  return sendToProcessor(fileInfo);
+  try {
+    Logger.log('Python側でファイルIDを使ってテキスト処理を依頼します...');
+    
+    const webhookUrl = PropertiesService.getScriptProperties().getProperty('WEBHOOK_URL');
+    if (!webhookUrl) {
+      Logger.log('警告: WEBHOOK_URLが設定されていません');
+      return false;
+    }
+    
+    // /process-textエンドポイントにリクエスト（file_idを含める）
+    const processTextUrl = webhookUrl.replace('/webhook', '/process-text');
+    
+    const payload = {
+      file_id: fileInfo.id,
+      file_name: fileInfo.name,
+      mime_type: fileInfo.mime_type || ''
+    };
+    
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    Logger.log(`テキスト処理リクエストを送信します: ${processTextUrl}`);
+    const response = UrlFetchApp.fetch(processTextUrl, options);
+    const responseCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    if (responseCode === 200) {
+      const responseData = JSON.parse(responseText);
+      const processedText = responseData.processed_text;
+      
+      if (!processedText) {
+        Logger.log('エラー: 処理済みテキストが取得できませんでした');
+        return false;
+      }
+      
+      Logger.log(`テキスト処理が完了しました (サイズ: ${processedText.length} 文字)`);
+      
+      // GAS側でDocumentAppを使用して議事録を作成
+      Logger.log('DocumentAppを使用して議事録を作成します...');
+      const docTitle = `議事録_${Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss')}`;
+      const newDoc = DocumentApp.create(docTitle);
+      const docId = newDoc.getId();
+      const docBody = newDoc.getBody();
+      
+      // テキストを挿入（setTextを使用）
+      Logger.log('テキストをドキュメントに挿入します...');
+      docBody.setText(processedText);
+      
+      // フォルダに移動
+      Logger.log(`議事録ファイルをフォルダに移動します (Document ID: ${docId})`);
+      moveDocumentToFolder(docId, PROCESSED_FOLDER_ID);
+      
+      Logger.log(`議事録の作成が完了しました: https://docs.google.com/document/d/${docId}`);
+      return true;
+    } else {
+      Logger.log(`エラー: テキスト処理に失敗しました (${responseCode})`);
+      Logger.log(`レスポンス: ${responseText}`);
+      return false;
+    }
+  } catch (error) {
+    Logger.log(`テキスト処理リクエスト中にエラーが発生しました: ${error.toString()}`);
+    Logger.log(error.stack);
+    return false;
+  }
 }
 
 /**
