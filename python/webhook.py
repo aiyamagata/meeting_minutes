@@ -111,9 +111,8 @@ def webhook():
                     drive_service = doc_creator.drive_service
                     
                     # Google Documentをtext/plain形式でエクスポート
-                    request = drive_service.files().export_media(fileId=file_id, mimeType='text/plain')
-                    import io
-                    content_bytes = request.execute()
+                    export_request = drive_service.files().export_media(fileId=file_id, mimeType='text/plain')
+                    content_bytes = export_request.execute()
                     content = content_bytes.decode('utf-8')
                     
                     logger.info(f'Drive APIでファイルを読み込みました (サイズ: {len(content)} 文字)')
