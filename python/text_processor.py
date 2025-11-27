@@ -147,12 +147,18 @@ class TextProcessor:
         return '\n'.join(processed_lines)
     
     def _format_text(self, text: str) -> str:
-        """テキストをフォーマット"""
+        """テキストをフォーマット（新しいフォーマット）"""
         lines = text.split('\n')
         formatted_lines = []
         
         # ヘッダー情報の抽出
         header_info = self._extract_header_info(lines)
+        
+        # アクション項目の抽出
+        action_items = self._extract_action_items(lines)
+        
+        # 本文（話し合ったことの要点）の抽出
+        main_content = self._extract_main_content(lines)
         
         # フォーマットに従って整形
         formatted_lines.append('=' * 50)
@@ -171,19 +177,28 @@ class TextProcessor:
         formatted_lines.append('-' * 50)
         formatted_lines.append('')
         
-        # 本文を追加
-        in_body = False
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            
-            # ヘッダー部分をスキップ
-            if not in_body and self._is_header_line(line):
-                continue
-            
-            in_body = True
-            formatted_lines.append(line)
+        # [話し合ったことの要点]セクション
+        formatted_lines.append('[話し合ったことの要点]')
+        formatted_lines.append('')
+        formatted_lines.extend(main_content)
+        formatted_lines.append('')
+        formatted_lines.append('-' * 50)
+        formatted_lines.append('')
+        
+        # [各々が次取るべきアクション]セクション
+        formatted_lines.append('[各々が次取るべきアクション]')
+        formatted_lines.append('')
+        
+        if action_items:
+            for action in action_items:
+                action_text = action['name']
+                if action.get('action'):
+                    action_text += f": {action['action']}"
+                if action.get('deadline'):
+                    action_text += f" （{action['deadline']}までに）"
+                formatted_lines.append(f"□ {action_text}")
+        else:
+            formatted_lines.append('（アクション項目は自動抽出できませんでした。手動で追加してください）')
         
         formatted_lines.append('')
         formatted_lines.append('=' * 50)
@@ -241,6 +256,77 @@ class TextProcessor:
                 return True
         
         return False
+    
+    def _extract_main_content(self, lines: List[str]) -> List[str]:
+        """本文（話し合ったことの要点）を抽出"""
+        content_lines = []
+        in_body = False
+        
+        for line in lines:
+            line = line.strip()
+            
+            # ヘッダー部分をスキップ
+            if not in_body:
+                if self._is_header_line(line):
+                    continue
+                # 空行の後の最初の非ヘッダー行から本文開始
+                if line and not self._is_header_line(line):
+                    in_body = True
+            
+            if in_body:
+                # アクション項目のキーワードが含まれている場合は本文終了
+                action_keywords = ['アクション', 'todo', 'to do', 'やること', '次回', '課題']
+                if any(keyword in line.lower() for keyword in action_keywords):
+                    break
+                    
+                if line:
+                    content_lines.append(line)
+        
+        return content_lines if content_lines else ['（内容を手動で追加してください）']
+    
+    def _extract_action_items(self, lines: List[str]) -> List[Dict[str, str]]:
+        """アクション項目を抽出"""
+        action_items = []
+        
+        # アクション項目のパターン
+        action_patterns = [
+            # "名前: アクション内容 (期日までに)" 形式
+            r'^([^:：]+)[:：]\s*(.+?)(?:（(.+?)までに）|\((.+?)までに\))?$',
+            # "名前 - アクション内容" 形式
+            r'^([^-]+?)\s*-\s*(.+)$',
+        ]
+        
+        action_keywords = ['アクション', 'todo', 'to do', 'やること', '次回', '課題', 'タスク']
+        
+        in_action_section = False
+        for line in lines:
+            line = line.strip()
+            
+            # アクションセクションの開始を検出
+            if any(keyword in line.lower() for keyword in action_keywords):
+                in_action_section = True
+                continue
+            
+            if in_action_section or ':' in line or '：' in line:
+                # パターンマッチングでアクション項目を抽出
+                for pattern in action_patterns:
+                    match = re.search(pattern, line)
+                    if match:
+                        name = match.group(1).strip()
+                        action_text = match.group(2).strip() if len(match.groups()) > 1 else ''
+                        deadline = match.group(3) or (match.group(4) if len(match.groups()) > 3 else None)
+                        
+                        # 名前をマッピング
+                        mapped_name = self.participant_mapper.map(name)
+                        
+                        action_items.append({
+                            'name': mapped_name,
+                            'action': action_text if action_text else None,
+                            'deadline': deadline.strip() if deadline else None
+                        })
+                        break
+        
+        return action_items
     
     def _clean_text(self, text: str) -> str:
         """不要な部分を削除"""
