@@ -331,10 +331,14 @@ class TextProcessor:
                                 action_text = ''
                             # deadlineはgroup(3)またはgroup(4)から取得
                             deadline = None
-                            if match.lastindex and match.lastindex >= 3:
-                                deadline = match.group(3)
-                            elif match.lastindex and match.lastindex >= 4:
-                                deadline = match.group(4)
+                            try:
+                                if match.lastindex and match.lastindex >= 3:
+                                    deadline = match.group(3)
+                                elif match.lastindex and match.lastindex >= 4:
+                                    deadline = match.group(4)
+                            except IndexError:
+                                # グループが存在しない場合はNoneのまま
+                                deadline = None
                             
                             # 名前をマッピング
                             mapped_name = self.participant_mapper.map(name)

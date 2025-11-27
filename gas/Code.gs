@@ -225,11 +225,29 @@ function extractFileContent(file, mimeType) {
   if (mimeType === 'application/vnd.google-apps.document') {
     Logger.log('Google Documentとして処理します');
     try {
-      const doc = DocumentApp.openById(file.getId());
-      const body = doc.getBody();
-      const text = body.getText();
-      Logger.log('Google Documentからテキストを取得しました');
-      return text;
+      // 方法1: DocumentAppを使用（推奨）
+      try {
+        const doc = DocumentApp.openById(file.getId());
+        const body = doc.getBody();
+        const text = body.getText();
+        Logger.log('Google Documentからテキストを取得しました（DocumentApp使用）');
+        return text;
+      } catch (docError) {
+        Logger.log(`DocumentAppでの読み込みに失敗しました: ${docError.toString()}`);
+        Logger.log('Drive APIのexport機能を使用してテキストを取得します...');
+        
+        // 方法2: Drive APIのexport機能を使用（フォールバック）
+        try {
+          const fileId = file.getId();
+          const docBlob = DriveApp.getFileById(fileId).getAs('text/plain');
+          const text = docBlob.getDataAsString('UTF-8');
+          Logger.log('Google Documentからテキストを取得しました（Drive API export使用）');
+          return text;
+        } catch (exportError) {
+          Logger.log(`Drive API exportでの読み込みに失敗しました: ${exportError.toString()}`);
+          throw new Error(`Google Documentの読み込みに失敗しました。DocumentApp: ${docError.toString()}, Drive API: ${exportError.toString()}`);
+        }
+      }
     } catch (error) {
       Logger.log(`Google Documentの読み込みに失敗しました: ${error.toString()}`);
       throw new Error(`Google Documentの読み込みに失敗しました: ${error.toString()}`);
