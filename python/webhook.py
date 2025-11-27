@@ -93,13 +93,41 @@ def webhook():
             return jsonify({'error': f'Missing fields: {", ".join(missing_fields)}'}), 400
         
         # コンテンツサイズをログに記録
-        content_size = len(data.get('content', ''))
+        content = data.get('content', '')
+        content_size = len(content)
         logger.info(f'Webhook受信: {data["file_name"]} (コンテンツサイズ: {content_size} 文字)')
+        
+        # contentが空の場合、file_idを使ってDrive APIで読み込む
+        if not content or content.strip() == '':
+            file_id = data.get('file_id')
+            mime_type = data.get('mime_type', '')
+            
+            if file_id and mime_type == 'application/vnd.google-apps.document':
+                logger.info(f'contentが空のため、Drive APIを使用してファイルを読み込みます (file_id: {file_id})')
+                try:
+                    # GoogleDocCreatorを使用してDrive APIサービスを取得
+                    from python.google_doc_creator import GoogleDocCreator
+                    doc_creator = GoogleDocCreator(config)
+                    drive_service = doc_creator.drive_service
+                    
+                    # Google Documentをtext/plain形式でエクスポート
+                    request = drive_service.files().export_media(fileId=file_id, mimeType='text/plain')
+                    import io
+                    content_bytes = request.execute()
+                    content = content_bytes.decode('utf-8')
+                    
+                    logger.info(f'Drive APIでファイルを読み込みました (サイズ: {len(content)} 文字)')
+                except Exception as e:
+                    logger.error(f'Drive APIでのファイル読み込みに失敗しました: {str(e)}')
+                    return jsonify({'error': f'Failed to read file from Drive API: {str(e)}'}), 500
+            else:
+                logger.error('contentが空で、file_idまたはmime_typeが不足しています')
+                return jsonify({'error': 'Content is empty and file_id/mime_type is missing'}), 400
         
         # 文字起こしを処理
         try:
             result = process_transcript(
-                transcript_content=data['content'],
+                transcript_content=content,
                 file_name=data['file_name'],
                 config=config,
                 logger=logger

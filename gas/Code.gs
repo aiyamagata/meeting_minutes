@@ -155,10 +155,16 @@ function processTranscriptFile(file) {
       throw new Error(`ファイル内容の取得に失敗しました: ${extractError.toString()}`);
     }
     
-    // 内容が空または無効な場合はスキップ
+    // 内容が空または無効な場合の処理
     if (!content || content.trim().length === 0) {
-      Logger.log('警告: ファイルの内容が空です。スキップします。');
-      return;
+      // Google Documentの場合、Python側でファイルIDを使って読み込む
+      if (mimeType === 'application/vnd.google-apps.document') {
+        Logger.log('警告: GAS側での読み込みが失敗しました。Python側でファイルIDを使って読み込みます。');
+        // 空のcontentのまま送信（Python側で処理）
+      } else {
+        Logger.log('警告: ファイルの内容が空です。スキップします。');
+        return;
+      }
     }
     
     // PDFの生データが含まれている場合はエラー
@@ -174,7 +180,8 @@ function processTranscriptFile(file) {
       url: file.getUrl(),
       created: file.getDateCreated(),
       modified: file.getLastUpdated(),
-      content: content
+      content: content,
+      mime_type: mimeType  // MIMEタイプも送信（Python側で使用）
     };
     
     // 処理済みとしてマーク
@@ -224,33 +231,25 @@ function extractFileContent(file, mimeType) {
   // Google Documentの場合
   if (mimeType === 'application/vnd.google-apps.document') {
     Logger.log('Google Documentとして処理します');
+    const fileId = file.getId();
+    
+    // 方法1: DocumentAppを使用（推奨）
     try {
-      // 方法1: DocumentAppを使用（推奨）
-      try {
-        const doc = DocumentApp.openById(file.getId());
-        const body = doc.getBody();
-        const text = body.getText();
-        Logger.log('Google Documentからテキストを取得しました（DocumentApp使用）');
-        return text;
-      } catch (docError) {
-        Logger.log(`DocumentAppでの読み込みに失敗しました: ${docError.toString()}`);
-        Logger.log('Drive APIのexport機能を使用してテキストを取得します...');
-        
-        // 方法2: Drive APIのexport機能を使用（フォールバック）
-        try {
-          const fileId = file.getId();
-          const docBlob = DriveApp.getFileById(fileId).getAs('text/plain');
-          const text = docBlob.getDataAsString('UTF-8');
-          Logger.log('Google Documentからテキストを取得しました（Drive API export使用）');
-          return text;
-        } catch (exportError) {
-          Logger.log(`Drive API exportでの読み込みに失敗しました: ${exportError.toString()}`);
-          throw new Error(`Google Documentの読み込みに失敗しました。DocumentApp: ${docError.toString()}, Drive API: ${exportError.toString()}`);
-        }
-      }
-    } catch (error) {
-      Logger.log(`Google Documentの読み込みに失敗しました: ${error.toString()}`);
-      throw new Error(`Google Documentの読み込みに失敗しました: ${error.toString()}`);
+      const doc = DocumentApp.openById(fileId);
+      const body = doc.getBody();
+      const text = body.getText();
+      Logger.log('Google Documentからテキストを取得しました（DocumentApp使用）');
+      return text;
+    } catch (docError) {
+      Logger.log(`DocumentAppでの読み込みに失敗しました: ${docError.toString()}`);
+      Logger.log('警告: GAS側でのGoogle Documentの読み込みが失敗しました。');
+      Logger.log('Python側でDrive APIを使用してファイルを読み込む必要があります。');
+      Logger.log('ファイルID: ' + fileId);
+      
+      // 空の文字列を返し、Python側でファイルIDを使って読み込む
+      // processTranscriptFileで特別な処理を行う必要がある
+      // ここでは空文字列を返し、Python側でファイルIDを使って読み込む
+      return '';  // 空文字列を返し、Python側で処理
     }
   }
   
