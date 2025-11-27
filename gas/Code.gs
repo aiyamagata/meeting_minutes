@@ -388,7 +388,8 @@ function sendToProcessor(fileInfo) {
       file_url: fileInfo.url,
       created: fileInfo.created.toISOString(),
       modified: fileInfo.modified.toISOString(),
-      content: fileInfo.content
+      content: fileInfo.content,
+      mime_type: fileInfo.mime_type || ''  // MIMEタイプも送信（Python側で使用）
     };
     
     // ペイロードサイズをログに記録
