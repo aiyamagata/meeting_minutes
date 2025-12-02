@@ -4,6 +4,8 @@
 
 Google Meetの文字起こしを取得し、自社フォーマットに整形してGoogle Documentとして保存、Slackに自動投稿するツールです。
 
+**GASのみで動作するシンプルな構成**になっています。
+
 ## 🎯 主な機能
 
 - ✅ Google Meetの文字起こしを自動取得
@@ -14,88 +16,123 @@ Google Meetの文字起こしを取得し、自社フォーマットに整形し
 
 ## 🛠️ 使用技術
 
-- **Google Apps Script (GAS)**: Google Meet文字起こしの取得
-- **Python**: テキスト処理・整形
-- **Heroku**: 定期実行・スケジューリング
-- **GitHub**: コード管理
+- **Google Apps Script (GAS)**: 全ての処理（ファイル検索・テキスト処理・Document作成・Slack投稿）
 - **Slack API**: 自動投稿
-- **Google Workspace API**: Document作成・管理
+- **Google Workspace API**: Document作成・管理（GASのDocumentAppを使用）
+
+## 🎨 構成の特徴
+
+- ✅ **GASのみで動作**（Python/Heroku不要）
+- ✅ **シンプルで管理が容易**
+- ✅ **エラーが少ない**
+- ✅ **完全無料**
 
 ## 📁 プロジェクト構成
 
 ```
 meeting_minutes for everyone/
-├── README.md                 # このファイル
-├── SETUP_GUIDE.md           # 詳細な実装手引き
-├── SCHEDULE.md              # 実装スケジュール
-├── gas/                     # Google Apps Script
-│   ├── Code.gs             # メインスクリプト
-│   └── appsscript.json     # マニフェスト
-├── python/                   # Pythonスクリプト
-│   ├── main.py             # メイン処理
-│   ├── webhook.py          # Webhookエンドポイント（Heroku用）
-│   ├── text_processor.py   # テキスト処理
-│   ├── slack_poster.py     # Slack投稿
-│   ├── google_doc_creator.py # Google Document作成
-│   ├── google_oauth.py     # OAuth 2.0認証（サービスアカウント代替）
-│   └── config.py           # 設定管理
-├── config/                  # 設定ファイル
-│   ├── config.json.example # 設定テンプレート
-│   └── participants.json   # 参加者名マッピング
-└── requirements.txt        # Python依存関係
+├── README.md                          # このファイル
+├── SIMPLE_SETUP_GUIDE.md             # セットアップガイド（GASのみ版）
+├── 移行ガイド.md                      # HerokuからGASのみ版への移行ガイド
+├── TECHNOLOGY_CHOICE_GUIDE.md        # 技術選択ガイド（Heroku vs GAS）
+├── gas/                              # Google Apps Script
+│   ├── Code.gs                      # メインスクリプト（GASのみ版）
+│   └── appsscript.json              # マニフェスト
+├── config/                           # 設定ファイル
+│   └── participants.json            # 参加者名マッピング（参考用）
+└── _archive/                        # アーカイブ（旧構成のドキュメント）
+    ├── HEROKU_DOCS.md
+    ├── TROUBLESHOOTING.md
+    └── COMPLEX_DOCS.md
 ```
 
 ## 🚀 クイックスタート
 
-**最短で始める場合は [QUICK_START.md](./QUICK_START.md) を参照してください。**
+### 1. GASプロジェクトを作成
 
-詳細な実装手順：
+1. [Google Apps Script](https://script.google.com/) にアクセス
+2. 「新しいプロジェクト」を作成
+3. `gas/Code.gs` の内容をコピーして貼り付け
 
-1. **セットアップ手引きを確認**
-   ```bash
-   cat SETUP_GUIDE.md
-   ```
+### 2. 設定を確認・変更
 
-2. **スケジュールを確認**
-   ```bash
-   cat SCHEDULE.md
-   ```
+`Code.gs` の先頭部分で以下を設定：
 
-3. **実装を開始**
-   - `SETUP_GUIDE.md`に従って順番に実装を進めてください
-   - 各ステップで動作確認を行いながら進めます
+```javascript
+const CONFIG = {
+  TRANSCRIPT_FOLDER_ID: 'あなたのフォルダID',
+  PROCESSED_FOLDER_ID: 'あなたのフォルダID',
+  SEARCH_DAYS: 30
+};
+
+const PARTICIPANT_MAPPING = {
+  'ニックネーム': '正式名',
+  // ...
+};
+```
+
+### 3. Slack設定
+
+GASの「プロジェクトの設定」→「スクリプト プロパティ」で：
+- `SLACK_BOT_TOKEN`: Slack Bot Token
+- `SLACK_CHANNEL`: 投稿先チャンネル（オプション）
+
+### 4. テスト実行
+
+`testGetMeetingTranscripts` 関数を実行して動作確認
+
+詳細は **[SIMPLE_SETUP_GUIDE.md](./SIMPLE_SETUP_GUIDE.md)** を参照してください。
 
 ## 📚 ドキュメント
 
-- [SETUP_GUIDE.md](./SETUP_GUIDE.md) - 詳細な実装手引き
-- [SCHEDULE.md](./SCHEDULE.md) - 実装スケジュール（2週間計画）
-- [QUICK_START.md](./QUICK_START.md) - クイックスタートガイド
-- [OAUTH_SETUP.md](./OAUTH_SETUP.md) - OAuth 2.0認証セットアップガイド（サービスアカウントキーが使えない場合）
+### セットアップ関連
+- **[SIMPLE_SETUP_GUIDE.md](./SIMPLE_SETUP_GUIDE.md)** - GASのみ版のセットアップガイド
+- **[移行ガイド.md](./移行ガイド.md)** - HerokuからGASのみ版への移行ガイド
+
+### 技術選択
+- **[TECHNOLOGY_CHOICE_GUIDE.md](./TECHNOLOGY_CHOICE_GUIDE.md)** - 技術選択ガイド（Heroku vs GAS）
+- **[技術選択_簡潔版.md](./技術選択_簡潔版.md)** - 簡潔版
+
+### 構造分析
+- **[要約_構造の整理とシンプル化.md](./要約_構造の整理とシンプル化.md)** - 構造の整理まとめ
+- **[STRUCTURE_ANALYSIS.md](./STRUCTURE_ANALYSIS.md)** - 構造分析
+- **[STRUCTURE_COMPARISON.md](./STRUCTURE_COMPARISON.md)** - 構造比較
+
+### アーカイブ
+- `_archive/` フォルダ - 旧構成（GAS + Python/Heroku）のドキュメント
 
 ## ⚙️ 必要な準備
 
 ### アカウント・アクセス権限
 - Google Workspace アカウント（管理者権限推奨）
 - Slack ワークスペース（管理者権限推奨）
-- Heroku アカウント（無料プラン可）
-- GitHub アカウント
 
 ### API トークン・認証情報
-- Google Cloud Platform プロジェクト
 - Slack App の作成（Bot Token）
-- Heroku API Key
 
 ## 🔐 セキュリティ注意事項
 
-- 認証情報は絶対にGitHubにコミットしないでください
-- `.env`ファイルや`config.json`は`.gitignore`に追加済みです
-- 本番環境では環境変数を使用してください
+- Slack Bot TokenはGASのプロパティサービスで管理（GitHubにコミットしない）
+- フォルダIDはコード内で管理（必要に応じてプロパティサービスに移行可能）
 
 ## 📞 サポート
 
-実装中に問題が発生した場合は、`SETUP_GUIDE.md`のトラブルシューティングセクションを参照してください。
+実装中に問題が発生した場合は、`SIMPLE_SETUP_GUIDE.md`のトラブルシューティングセクションを参照してください。
 
 ## 📝 ライセンス
 
 このプロジェクトは社内利用を想定しています。
 
+---
+
+## 🔄 旧構成からの移行について
+
+このプロジェクトは、以前は **GAS + Python/Heroku** の構成でしたが、**GASのみ版**に移行しました。
+
+**移行理由：**
+- シンプルで管理が容易
+- エラーが少ない
+- 完全無料
+- 機能は同等に実現可能
+
+詳細は **[移行ガイド.md](./移行ガイド.md)** を参照してください。
