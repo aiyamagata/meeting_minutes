@@ -13,12 +13,14 @@ Google Meetの文字起こしを取得し、自社フォーマットに整形し
 - ✅ 指定フォーマットに沿った議事録の自動生成
 - ✅ Google Documentとして自動保存
 - ✅ Slackチャンネルへの自動投稿
+- ✅ （オプション）Gemini APIを使用したAI分類機能
 
 ## 🛠️ 使用技術
 
 - **Google Apps Script (GAS)**: 全ての処理（ファイル検索・テキスト処理・Document作成・Slack投稿）
 - **Slack API**: 自動投稿
 - **Google Workspace API**: Document作成・管理（GASのDocumentAppを使用）
+- **Gemini API**（オプション）: AI分類機能
 
 ## 🎨 構成の特徴
 
@@ -32,13 +34,12 @@ Google Meetの文字起こしを取得し、自社フォーマットに整形し
 ```
 meeting_minutes for everyone/
 ├── README.md                          # このファイル
-├── SIMPLE_SETUP_GUIDE.md             # セットアップガイド（GASのみ版）
-├── 移行ガイド.md                      # HerokuからGASのみ版への移行ガイド
+├── セットアップガイド.md               # セットアップ手順（統合版）
 ├── TECHNOLOGY_CHOICE_GUIDE.md        # 技術選択ガイド（Heroku vs GAS）
 ├── gas/                              # Google Apps Script
-│   ├── Code.gs                      # メインスクリプト（GASのみ版）
+│   ├── Code.gs                      # メインスクリプト
 │   └── appsscript.json              # マニフェスト
-├── config/                           # 設定ファイル
+├── config/                           # 設定ファイル（参考用）
 │   └── participants.json            # 参加者名マッピング（参考用）
 └── _archive/                        # アーカイブ（旧構成のドキュメント）
     ├── HEROKU_DOCS.md
@@ -81,25 +82,25 @@ GASの「プロジェクトの設定」→「スクリプト プロパティ」�
 
 `testGetMeetingTranscripts` 関数を実行して動作確認
 
-詳細は **[SIMPLE_SETUP_GUIDE.md](./SIMPLE_SETUP_GUIDE.md)** を参照してください。
+詳細は **[セットアップガイド.md](./セットアップガイド.md)** を参照してください。
 
 ## 📚 ドキュメント
 
-### セットアップ関連
-- **[SIMPLE_SETUP_GUIDE.md](./SIMPLE_SETUP_GUIDE.md)** - GASのみ版のセットアップガイド
-- **[移行ガイド.md](./移行ガイド.md)** - HerokuからGASのみ版への移行ガイド
+このプロジェクトのドキュメントは以下の3つに集約されています：
 
-### 技術選択
-- **[TECHNOLOGY_CHOICE_GUIDE.md](./TECHNOLOGY_CHOICE_GUIDE.md)** - 技術選択ガイド（Heroku vs GAS）
-- **[技術選択_簡潔版.md](./技術選択_簡潔版.md)** - 簡潔版
+1. **[セットアップガイド.md](./セットアップガイド.md)** - 完全なセットアップガイド
+   - 初期設定手順
+   - Slack設定方法
+   - Gemini API設定方法
+   - Herokuからの移行手順
+   - トラブルシューティング
 
-### 構造分析
-- **[要約_構造の整理とシンプル化.md](./要約_構造の整理とシンプル化.md)** - 構造の整理まとめ
-- **[STRUCTURE_ANALYSIS.md](./STRUCTURE_ANALYSIS.md)** - 構造分析
-- **[STRUCTURE_COMPARISON.md](./STRUCTURE_COMPARISON.md)** - 構造比較
+2. **[TECHNOLOGY_CHOICE_GUIDE.md](./TECHNOLOGY_CHOICE_GUIDE.md)** - 技術選択ガイド
+   - Heroku vs GAS の比較
+   - 技術選択の判断基準
+   - 各技術の特徴と適性
 
-### アーカイブ
-- `_archive/` フォルダ - 旧構成（GAS + Python/Heroku）のドキュメント
+3. **README.md**（このファイル）- プロジェクト概要とクイックスタート
 
 ## ⚙️ 必要な準備
 
@@ -109,15 +110,17 @@ GASの「プロジェクトの設定」→「スクリプト プロパティ」�
 
 ### API トークン・認証情報
 - Slack App の作成（Bot Token）
+- （オプション）Gemini API Key（AI分類機能を使用する場合）
 
 ## 🔐 セキュリティ注意事項
 
 - Slack Bot TokenはGASのプロパティサービスで管理（GitHubにコミットしない）
+- Gemini API KeyはGASのプロパティサービスで管理（GitHubにコミットしない）
 - フォルダIDはコード内で管理（必要に応じてプロパティサービスに移行可能）
 
 ## 📞 サポート
 
-実装中に問題が発生した場合は、`SIMPLE_SETUP_GUIDE.md`のトラブルシューティングセクションを参照してください。
+実装中に問題が発生した場合は、`セットアップガイド.md`のトラブルシューティングセクションを参照してください。
 
 ## 📝 ライセンス
 
@@ -135,4 +138,4 @@ GASの「プロジェクトの設定」→「スクリプト プロパティ」�
 - 完全無料
 - 機能は同等に実現可能
 
-詳細は **[移行ガイド.md](./移行ガイド.md)** を参照してください。
+詳細は **[セットアップガイド.md](./セットアップガイド.md)** の「HerokuからGASのみ版への移行」セクションを参照してください。
